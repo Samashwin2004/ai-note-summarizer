@@ -1,0 +1,12 @@
+# Ignore Python sandbox environment
+backend/venv/
+backend/__pycache__/
+backend/.env
+
+# Ignore Node software folders
+frontend/node_modules/
+frontend/dist/
+
+# Ignore local system files
+.DS_Store
+Thumbs.db
