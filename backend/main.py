@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware  # <-- Add this import
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 from openai import OpenAI
@@ -9,16 +9,37 @@ load_dotenv()
 
 app = FastAPI()
 
-# 👇 ADD THIS CORS BLOCK RIGHT HERE 👇
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # This allows your Vercel frontend to talk to your backend safely
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows POST, OPTIONS, etc.
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 client = OpenAI(
     base_url="https://api.groq.com/openai/v1",
     api_key=os.environ.get("GROQ_API_KEY")
 )
+
+class NoteInput(BaseModel):
+    text: str
+
+@app.post("/summarize")
+async def summarize_note(input_data: NoteInput):
+    if not input_data.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+    
+    try:
+        response = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[
+                {"role": "system", "value": "You are an expert assistant. Summarize the text into clear sections: Summary, Action Items, and Key Decisions. Respond in structured JSON matching fields: summary (string), action_items (list of strings), key_decisions (list of strings)."},
+                {"role": "user", "content": input_data.text}
+            ],
+            response_format={"type": "json_object"}
+        )
+        import json
+        return json.loads(response.choices[0].message.content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
