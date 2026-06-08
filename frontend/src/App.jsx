@@ -24,7 +24,7 @@ export default function App() {
 
     try {
       // 3. Make the live network call to your hosted Render backend
-      const response = await fetch('https://ai-note-summarizer-backend.onrender.com/summarize', {
+      const response = await fetch('https://ai-note-summarizer-f6i6.onrender.com/summarize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
