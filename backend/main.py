@@ -11,7 +11,6 @@ load_dotenv()
 app = FastAPI()
 
 # --- CORS MIDDLEWARE SECURITY BRIDGE ---
-# This explicitly allows your Vercel frontend to talk to this backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  
@@ -32,14 +31,13 @@ class NoteInput(BaseModel):
 
 @app.post("/summarize")
 async def summarize_note(input_data: NoteInput):
-    # Guard clause against empty submissions
     if not input_data.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
     
     try:
-        # Requesting completion matrix from Groq AI Chips
+        # Requesting completion matrix from Groq using the active supported model
         response = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",  # <-- Updated to active model identifier
             messages=[
                 {
                     "role": "system", 
@@ -53,7 +51,6 @@ async def summarize_note(input_data: NoteInput):
             response_format={"type": "json_object"}
         )
         
-        # Unpack the raw JSON response payload and route back to the user interface
         return json.loads(response.choices[0].message.content)
         
     except Exception as e:
