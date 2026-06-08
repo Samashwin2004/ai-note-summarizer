@@ -23,13 +23,13 @@ export default function App() {
     setError(null);
 
     try {
-      // 3. Make the live network call to our FastAPI server port
-      const response = await fetch('http://127.0.0.1:8000/summarize', {
+      // 3. Make the live network call to your hosted Render backend
+      const response = await fetch('https://ai-note-summarizer-backend.onrender.com/summarize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text: text }), // Pack our text up safely
+        body: JSON.stringify({ text: text }), // Safely pack your active input text state
       });
 
       // 4. If the server threw an error code (like 400 or 500), read the error
@@ -101,7 +101,7 @@ export default function App() {
             <div>
               <h3 style={{ color: '#28a745' }}>📝 Action Items</h3>
               <ul>
-                {result.action_items.map((item, index) => (
+                {result.action_items && result.action_items.map((item, index) => (
                   <li key={index} style={{ marginBottom: '8px', lineHeight: '1.4' }}>{item}</li>
                 ))}
               </ul>
@@ -109,7 +109,7 @@ export default function App() {
             <div>
               <h3 style={{ color: '#6f42c1' }}>⚖️ Key Decisions</h3>
               <ul>
-                {result.key_decisions.map((item, index) => (
+                {result.key_decisions && result.key_decisions.map((item, index) => (
                   <li key={index} style={{ marginBottom: '8px', lineHeight: '1.4' }}>{item}</li>
                 ))}
               </ul>
