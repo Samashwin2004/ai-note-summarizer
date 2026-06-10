@@ -36,21 +36,20 @@ async def summarize_note(input_data: NoteInput):
 
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
-    # Create a clean temporary file path
     temp_file_path = f"temp_{file.filename}"
     
     try:
-        # Read the raw incoming bytes directly from memory safely
+        # Read incoming media bytes straight from memory buffer
         contents = await file.read()
         with open(temp_file_path, "wb") as f:
             f.write(contents)
             
-        # Send the file to Groq Whisper
+        # Send the audio file to Groq Whisper
         with open(temp_file_path, "rb") as audio_file:
             transcription = client.audio.transcriptions.create(
                 model="whisper-large-v3", 
                 file=audio_file,
-                language="ta"  # Hardcoded target for Tamil/Tanglish vocal speech
+                language="ta"  # Sets transcription capture mode specifically for Tamil dialect matrix
             )
         
         transcript_text = transcription.text
@@ -62,12 +61,10 @@ async def transcribe_audio(file: UploadFile = File(...)):
         }
 
     except Exception as e:
-        # This will print the EXACT error message to your Render logs so we can see it
-        print(f"TRANSCRIBE ERROR DEBUG: {str(e)}")
+        print(f"TRANSCRIBE ERROR LOG: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
         
     finally:
-        # Guaranteed cleanup of the temp file
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
