@@ -10,6 +10,12 @@ load_dotenv()
 
 app = FastAPI()
 
+# --- HEALTH CHECK ENDPOINT (To verify Render deployment) ---
+@app.get("/")
+async def root():
+    return {"status": "healthy", "service": "Bilingual AI Engine alive"}
+
+# --- CORS MIDDLEWARE SECURITY BRIDGE ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  
@@ -18,8 +24,12 @@ app.add_middleware(
     allow_headers=["*"],  
 )
 
-# Native Groq Client Hook
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+# Initialize Groq Client
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    print("WARNING: GROQ_API_KEY environment variable is not set!")
+
+client = Groq(api_key=GROQ_API_KEY)
 
 class NoteInput(BaseModel):
     text: str
@@ -32,7 +42,9 @@ async def summarize_note(input_data: NoteInput):
 
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
-    temp_file_path = f"temp_{file.filename}"
+    # Use explicit absolute pathing to prevent temporary write tracking failures on cloud environments
+    temp_file_path = os.path.abspath(f"temp_{file.filename}")
+    
     try:
         contents = await file.read()
         with open(temp_file_path, "wb") as f:
@@ -53,6 +65,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
             "data": summary_data
         }
     except Exception as e:
+        print(f"TRANSCRIBE SYSTEM FAULT ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if os.path.exists(temp_file_path):
@@ -85,4 +98,11 @@ def generate_bilingual_summary(text_content: str):
         )
         return json.loads(response.choices[0].message.content)
     except Exception as e:
-        raise Exception(f"LLM Error: {str(e)}")
+        print(f"GROQ LLM PROCESS EXCEPTION: {str(e)}")
+        # Safe structural fallback to prevent backend crashing if JSON validation acts up
+        return {
+            "summary_en": "Processing error occurred.",
+            "summary_ta": "செயலாக்க பிழை ஏற்பட்டது.",
+            "action_items_en": [], "action_items_ta": [],
+            "key_decisions_en": [], "key_decisions_ta": []
+        }
