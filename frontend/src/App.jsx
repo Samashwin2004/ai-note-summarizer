@@ -78,7 +78,7 @@ export default function App() {
         body: formData,
       });
 
-      if (!response.ok) throw new Error("Audio translation matrix broken.");
+      if (!response.ok) throw new Error("Audio conversion matrix failed.");
       const data = await response.json();
       setText(data.transcript);
       setResult(data.data);
@@ -105,7 +105,7 @@ export default function App() {
 
       <div style={styles.headerSection}>
         <span style={styles.badge}>🇮🇳 BILINGUAL ENGINE ALIVE</span>
-        <h1 style={styles.title}>🎙️ Tamil & English Order Processor</h1>
+        <h1 style={styles.title}>🧠 AI Voice Note Summarizer</h1>
         <p style={styles.subtitle}>
           Record voice commands directly. The AI will preserve your speech and extract analytics in both languages.
         </p>
@@ -191,7 +191,7 @@ const styles = {
   container: { fontFamily: 'sans-serif', maxWidth: '850px', margin: '40px auto', padding: '0 20px', backgroundColor: '#f8fafc' },
   headerSection: { textAlign: 'center', marginBottom: '30px' },
   badge: { backgroundColor: '#ffedd5', color: '#ea580c', padding: '6px 12px', borderRadius: '9999px', fontSize: '12px', fontWeight: '700' },
-  title: { fontSize: '32px', color: '#0f172a', marginTop: '12px' },
+  title: { fontSize: '32px', color: '#0f172a', marginTop: '12px', fontWeight: '800' },
   subtitle: { color: '#64748b', fontSize: '15px', lineHeight: '1.5' },
   mainCard: { backgroundColor: '#fff', borderRadius: '14px', padding: '25px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' },
   voiceRow: { display: 'flex', justifyContent: 'center', marginBottom: '15px' },
