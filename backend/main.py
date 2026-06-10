@@ -10,7 +10,6 @@ load_dotenv()
 
 app = FastAPI()
 
-# --- CORS MIDDLEWARE SECURITY BRIDGE ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  
@@ -19,10 +18,8 @@ app.add_middleware(
     allow_headers=["*"],  
 )
 
-# Initialize the Native Groq Cloud Client safely
-client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY")
-)
+# Native Groq Client Hook
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 class NoteInput(BaseModel):
     text: str
@@ -36,19 +33,16 @@ async def summarize_note(input_data: NoteInput):
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
     temp_file_path = f"temp_{file.filename}"
-    
     try:
-        # Read incoming media bytes straight from memory buffer safely
         contents = await file.read()
         with open(temp_file_path, "wb") as f:
             f.write(contents)
             
-        # Send the audio file to Groq Whisper
         with open(temp_file_path, "rb") as audio_file:
             transcription = client.audio.transcriptions.create(
                 model="whisper-large-v3", 
                 file=audio_file,
-                language="ta"  # Tamil/Tanglish processing configuration
+                language="ta"
             )
         
         transcript_text = transcription.text
@@ -58,11 +52,8 @@ async def transcribe_audio(file: UploadFile = File(...)):
             "transcript": transcript_text,
             "data": summary_data
         }
-
     except Exception as e:
-        print(f"TRANSCRIBE ERROR LOG: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-        
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
