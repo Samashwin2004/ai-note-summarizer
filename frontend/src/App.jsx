@@ -41,21 +41,28 @@ export default function App() {
     audioChunksRef.current = [];
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
+      
+      // Determine best container format for the browser
+      let options = { mimeType: 'audio/webm' };
+      if (!MediaRecorder.isTypeSupported('audio/webm')) {
+        options = { mimeType: 'audio/ogg' };
+      }
+      
+      mediaRecorderRef.current = new MediaRecorder(stream, options);
       
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) audioChunksRef.current.push(event.data);
       };
 
       mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current.mimeType });
         await sendAudioToBackend(audioBlob);
       };
 
       mediaRecorderRef.current.start();
       setIsRecording(true);
     } catch (err) {
-      setError("Microphone connectivity rejected.");
+      setError("Microphone connectivity rejected. Please check permissions.");
     }
   };
 
@@ -70,7 +77,8 @@ export default function App() {
   const sendAudioToBackend = async (audioBlob) => {
     setLoading(true); setResult(null);
     const formData = new FormData();
-    formData.append("file", audioBlob, "user_voice.wav");
+    // Pass as webm audio file payload container
+    formData.append("file", audioBlob, "user_voice.webm");
 
     try {
       const response = await fetch(`${BACKEND_URL}/transcribe`, {
@@ -78,10 +86,13 @@ export default function App() {
         body: formData,
       });
 
-      if (!response.ok) throw new Error("Audio conversion matrix failed.");
-      const data = await response.json();
-      setText(data.transcript);
-      setResult(data.data);
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.detail || "Audio transcription pipeline failed.");
+      }
+      
+      setText(resData.transcript);
+      setResult(resData.data);
     } catch (err) {
       setError(err.message);
     } finally {
