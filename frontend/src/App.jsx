@@ -41,8 +41,6 @@ export default function App() {
     audioChunksRef.current = [];
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Determine best container format for the browser
       let options = { mimeType: 'audio/webm' };
       if (!MediaRecorder.isTypeSupported('audio/webm')) {
         options = { mimeType: 'audio/ogg' };
@@ -77,7 +75,6 @@ export default function App() {
   const sendAudioToBackend = async (audioBlob) => {
     setLoading(true); setResult(null);
     const formData = new FormData();
-    // Pass as webm audio file payload container
     formData.append("file", audioBlob, "user_voice.webm");
 
     try {
@@ -91,6 +88,7 @@ export default function App() {
         throw new Error(resData.detail || "Audio transcription pipeline failed.");
       }
       
+      // Captures your raw spoken words straight into the text box state!
       setText(resData.transcript);
       setResult(resData.data);
     } catch (err) {
@@ -108,17 +106,13 @@ export default function App() {
           70% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); transform: scale(1.02); }
           100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); transform: scale(1); }
         }
-        @keyframes shimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
-        }
       `}</style>
 
       <div style={styles.headerSection}>
-        <span style={styles.badge}>🇮🇳 BILINGUAL ENGINE ALIVE</span>
+        <span style={styles.badge}>🇮🇳 BILINGUAL TRANSCRIPTION RADAR</span>
         <h1 style={styles.title}>🧠 AI Voice Note Summarizer</h1>
         <p style={styles.subtitle}>
-          Record voice commands directly. The AI will preserve your speech and extract analytics in both languages.
+          Speak in Tamil or Tanglish. Your raw words will be converted directly into a text note, then fully translated and summarized below.
         </p>
       </div>
 
@@ -130,15 +124,20 @@ export default function App() {
             </button>
           ) : (
             <button onClick={stopRecording} style={styles.btnMicStop}>
-              🔴 Recording Audio... Click to End
+              🔴 Recording... Click to Stop & Transcribe
             </button>
           )}
         </div>
 
+        {/* --- DISPLAY SECTION FOR CUSTOMER'S RAW WORDS --- */}
+        <div style={{ marginBottom: '8px', fontWeight: '700', color: '#334155', fontSize: '14px' }}>
+          📝 CUSTOMER INPUT NOTE (RAW TEXT / பேச்சின் உரை):
+        </div>
+        
         <textarea
-          rows="6"
+          rows="5"
           style={styles.textarea}
-          placeholder="Audio transcription text will stream into here..."
+          placeholder="Your spoken words or pasted text will appear here exactly as stated..."
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={loading}
@@ -151,30 +150,20 @@ export default function App() {
           disabled={loading || isRecording}
           style={(loading || isRecording) ? styles.btnActionDisabled : styles.btnActionActive}
         >
-          {loading ? 'Processing Data Structures...' : 'Analyze Text Note ✨'}
+          {loading ? 'Processing Text Analytics...' : 'Analyze & Translate Text Note ✨'}
         </button>
       </div>
 
       {result && (
         <div style={styles.resultsContainer}>
           
-          {/* --- ENGLISH LAYOUT COLUMN --- */}
-          <h2 style={styles.sectionHeading}>🇬🇧 English Summary Analytics</h2>
-          <div style={styles.summaryBoxEn}>
-            <p style={styles.boxBodyText}>{result.summary_en}</p>
+          {/* --- RAW INPUT DISPLAY CONFIRMATION --- */}
+          <div style={styles.rawOutputCard}>
+            <h3 style={{ margin: '0 0 8px 0', color: '#0f172a' }}>✍️ Captured Speech Reference</h3>
+            <p style={{ margin: 0, color: '#475569', fontStyle: 'italic', backgroundColor: '#f1f5f9', padding: '12px', borderRadius: '6px' }}>
+              "{text}"
+            </p>
           </div>
-          <div style={styles.gridSplit}>
-            <div style={styles.cardBox}>
-              <h4 style={{color:'#2563eb', margin:'0 0 10px 0'}}>📝 Action Items</h4>
-              <ul>{result.action_items_en?.map((item, i) => <li key={i} style={styles.listItem}>{item}</li>)}</ul>
-            </div>
-            <div style={styles.cardBox}>
-              <h4 style={{color:'#7c3aed', margin:'0 0 10px 0'}}>⚖️ Key Decisions</h4>
-              <ul>{result.key_decisions_en?.map((item, i) => <li key={i} style={styles.listItem}>{item}</li>)}</ul>
-            </div>
-          </div>
-
-          <div style={{margin: '40px 0', borderTop: '2px dashed #cbd5e1'}} />
 
           {/* --- TAMIL LAYOUT COLUMN --- */}
           <h2 style={styles.sectionHeading}>🇮🇳 தமிழ் சுருக்கம் (Tamil Summary)</h2>
@@ -192,6 +181,24 @@ export default function App() {
             </div>
           </div>
 
+          <div style={{margin: '30px 0', borderTop: '2px dashed #cbd5e1'}} />
+
+          {/* --- ENGLISH LAYOUT COLUMN --- */}
+          <h2 style={styles.sectionHeading}>🇬🇧 English Translation & Summary Analytics</h2>
+          <div style={styles.summaryBoxEn}>
+            <p style={styles.boxBodyText}>{result.summary_en}</p>
+          </div>
+          <div style={styles.gridSplit}>
+            <div style={styles.cardBox}>
+              <h4 style={{color:'#2563eb', margin:'0 0 10px 0'}}>📝 Action Items</h4>
+              <ul>{result.action_items_en?.map((item, i) => <li key={i} style={styles.listItem}>{item}</li>)}</ul>
+            </div>
+            <div style={styles.cardBox}>
+              <h4 style={{color:'#7c3aed', margin:'0 0 10px 0'}}>⚖️ Key Decisions</h4>
+              <ul>{result.key_decisions_en?.map((item, i) => <li key={i} style={styles.listItem}>{item}</li>)}</ul>
+            </div>
+          </div>
+
         </div>
       )}
     </div>
@@ -201,19 +208,20 @@ export default function App() {
 const styles = {
   container: { fontFamily: 'sans-serif', maxWidth: '850px', margin: '40px auto', padding: '0 20px', backgroundColor: '#f8fafc' },
   headerSection: { textAlign: 'center', marginBottom: '30px' },
-  badge: { backgroundColor: '#ffedd5', color: '#ea580c', padding: '6px 12px', borderRadius: '9999px', fontSize: '12px', fontWeight: '700' },
+  badge: { backgroundColor: '#e0f2fe', color: '#0369a1', padding: '6px 12px', borderRadius: '9999px', fontSize: '12px', fontWeight: '700' },
   title: { fontSize: '32px', color: '#0f172a', marginTop: '12px', fontWeight: '800' },
   subtitle: { color: '#64748b', fontSize: '15px', lineHeight: '1.5' },
   mainCard: { backgroundColor: '#fff', borderRadius: '14px', padding: '25px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' },
-  voiceRow: { display: 'flex', justifyContent: 'center', marginBottom: '15px' },
-  btnMicStart: { padding: '12px 24px', background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' },
+  voiceRow: { display: 'flex', justifyContent: 'center', marginBottom: '20px' },
+  btnMicStart: { padding: '12px 24px', background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' },
   btnMicStop: { padding: '12px 24px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', animation: 'pulseGlow 1.5s infinite ease-in-out' },
   btnDisabled: { padding: '12px 24px', background: '#cbd5e1', color: '#94a3b8', border: 'none', borderRadius: '10px', cursor: 'not-allowed' },
-  textarea: { width: '100%', padding: '14px', fontSize: '16px', borderRadius: '10px', border: '1px solid #cbd5e1', boxSizing: 'border-box', outline: 'none', backgroundColor: '#f8fafc' },
+  textarea: { width: '100%', padding: '14px', fontSize: '16px', borderRadius: '10px', border: '1px solid #cbd5e1', boxSizing: 'border-box', outline: 'none', backgroundColor: '#f8fafc', marginBottom: '10px' },
   errorAlert: { color: '#b91c1c', backgroundColor: '#fef2f2', padding: '12px', borderRadius: '8px', marginTop: '12px' },
-  btnActionActive: { marginTop: '15px', padding: '14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '700', width: '100%' },
-  btnActionDisabled: { marginTop: '15px', padding: '14px', background: '#e2e8f0', color: '#64748b', border: 'none', borderRadius: '10px', width: '100%', animation: 'shimmer 1.5s infinite linear' },
+  btnActionActive: { marginTop: '5px', padding: '14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '700', width: '100%' },
+  btnActionDisabled: { marginTop: '5px', padding: '14px', background: '#e2e8f0', color: '#64748b', border: 'none', borderRadius: '10px', width: '100%' },
   resultsContainer: { marginTop: '35px', paddingBottom: '50px' },
+  rawOutputCard: { backgroundColor: '#fff', border: '1px solid #e2e8f0', padding: '15px', borderRadius: '12px', marginBottom: '25px' },
   sectionHeading: { fontSize: '20px', fontWeight: '700', color: '#0f172a', marginBottom: '15px' },
   summaryBoxEn: { backgroundColor: '#eff6ff', borderLeft: '5px solid #2563eb', padding: '15px', borderRadius: '0 10px 10px 0', marginBottom: '15px' },
   summaryBoxTa: { backgroundColor: '#f0fdf4', borderLeft: '5px solid #16a34a', padding: '15px', borderRadius: '0 10px 10px 0', marginBottom: '15px' },
