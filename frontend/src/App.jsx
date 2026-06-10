@@ -1,122 +1,213 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
 export default function App() {
-  // Input tracking
   const [text, setText] = useState('');
-  
-  // Network lifecycle tracking
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
-  // The function that fires across the network bridge
+  const BACKEND_URL = 'https://ai-note-summarizer-f6i6.onrender.com';
+
   const handleSummarize = async () => {
-    // 1. Guard against empty inputs
     if (!text.trim()) {
-      setError("Please paste some text before attempting to summarize!");
+      setError("Please paste text or record audio first!");
       return;
     }
-
-    // 2. Clear out any old states from previous clicks
-    setLoading(true);
-    setResult(null);
-    setError(null);
+    setLoading(true); setResult(null); setError(null);
 
     try {
-      // 3. Make the live network call to your hosted Render backend
-      const response = await fetch('https://ai-note-summarizer-f6i6.onrender.com/summarize', {
+      const response = await fetch(`${BACKEND_URL}/summarize`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: text }), // Safely pack your active input text state
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text }),
       });
 
-      // 4. If the server threw an error code (like 400 or 500), read the error
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Something went wrong on the server.");
-      }
-
-      // 5. Success! Parse the returned data structure
+      if (!response.ok) throw new Error("Server communication fault.");
       const data = await response.json();
       setResult(data);
-
     } catch (err) {
-      // Catch network drops or code failures
       setError(err.message);
     } finally {
-      // 6. Turn off the loading spinner state regardless of success or failure
+      setLoading(false);
+    }
+  };
+
+  const startRecording = async () => {
+    setError(null);
+    audioChunksRef.current = [];
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        await sendAudioToBackend(audioBlob);
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+    } catch (err) {
+      setError("Microphone connectivity rejected.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+    }
+  };
+
+  const sendAudioToBackend = async (audioBlob) => {
+    setLoading(true); setResult(null);
+    const formData = new FormData();
+    formData.append("file", audioBlob, "user_voice.wav");
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/transcribe`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Audio translation matrix broken.");
+      const data = await response.json();
+      setText(data.transcript);
+      setResult(data.data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: '700px', margin: '40px auto', padding: '20px', color: '#333' }}>
-      <h1>🧠 AI Note Summarizer</h1>
-      <p style={{ color: '#666' }}>Paste your meeting minutes or raw study notes to generate structured layouts.</p>
-      
-      {/* Text Area Input */}
-      <textarea
-        rows="10"
-        style={{ width: '100%', padding: '12px', fontSize: '16px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }}
-        placeholder="Type or paste your notes here..."
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        disabled={loading}
-      />
+    <div style={styles.container}>
+      <style>{`
+        @keyframes pulseGlow {
+          0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); transform: scale(1); }
+          70% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); transform: scale(1.02); }
+          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); transform: scale(1); }
+        }
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+      `}</style>
 
-      {/* Conditional Error Display */}
-      {error && (
-        <div style={{ color: '#dc3545', backgroundColor: '#f8d7da', padding: '10px', borderRadius: '6px', marginTop: '10px', fontWeight: '500' }}>
-          ⚠️ Error: {error}
+      <div style={styles.headerSection}>
+        <span style={styles.badge}>🇮🇳 BILINGUAL ENGINE ALIVE</span>
+        <h1 style={styles.title}>🎙️ Tamil & English Order Processor</h1>
+        <p style={styles.subtitle}>
+          Record voice commands directly. The AI will preserve your speech and extract analytics in both languages.
+        </p>
+      </div>
+
+      <div style={styles.mainCard}>
+        <div style={styles.voiceRow}>
+          {!isRecording ? (
+            <button onClick={startRecording} disabled={loading} style={loading ? styles.btnDisabled : styles.btnMicStart}>
+              🎤 Start Speaking (Tamil/Tanglish)
+            </button>
+          ) : (
+            <button onClick={stopRecording} style={styles.btnMicStop}>
+              🔴 Recording Audio... Click to End
+            </button>
+          )}
         </div>
-      )}
 
-      {/* Trigger Button */}
-      <button 
-        onClick={handleSummarize}
-        disabled={loading}
-        style={{ 
-          marginTop: '12px', padding: '12px 24px', fontSize: '16px', 
-          background: loading ? '#9eccfa' : '#0070f3', color: 'white', 
-          border: 'none', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer',
-          fontWeight: 'bold', width: '100%'
-        }}
-      >
-        {loading ? 'Processing through AI Brain...' : 'Summarize Note ✨'}
-      </button>
+        <textarea
+          rows="6"
+          style={styles.textarea}
+          placeholder="Audio transcription text will stream into here..."
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          disabled={loading}
+        />
 
-      {/* --- RESULTS PANEL AREA --- */}
+        {error && <div style={styles.errorAlert}>⚠️ {error}</div>}
+
+        <button 
+          onClick={handleSummarize}
+          disabled={loading || isRecording}
+          style={(loading || isRecording) ? styles.btnActionDisabled : styles.btnActionActive}
+        >
+          {loading ? 'Processing Data Structures...' : 'Analyze Text Note ✨'}
+        </button>
+      </div>
+
       {result && (
-        <div style={{ marginTop: '30px', borderTop: '2px solid #eaeaea', paddingTop: '20px' }}>
-          <h2>🎯 Analysis Results</h2>
+        <div style={styles.resultsContainer}>
           
-          <div style={{ backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
-            <h3 style={{ marginTop: 0, color: '#0070f3' }}>Summary</h3>
-            <p style={{ lineHeight: '1.6' }}>{result.summary}</p>
+          {/* --- ENGLISH LAYOUT COLUMN --- */}
+          <h2 style={styles.sectionHeading}>🇬🇧 English Summary Analytics</h2>
+          <div style={styles.summaryBoxEn}>
+            <p style={styles.boxBodyText}>{result.summary_en}</p>
+          </div>
+          <div style={styles.gridSplit}>
+            <div style={styles.cardBox}>
+              <h4 style={{color:'#2563eb', margin:'0 0 10px 0'}}>📝 Action Items</h4>
+              <ul>{result.action_items_en?.map((item, i) => <li key={i} style={styles.listItem}>{item}</li>)}</ul>
+            </div>
+            <div style={styles.cardBox}>
+              <h4 style={{color:'#7c3aed', margin:'0 0 10px 0'}}>⚖️ Key Decisions</h4>
+              <ul>{result.key_decisions_en?.map((item, i) => <li key={i} style={styles.listItem}>{item}</li>)}</ul>
+            </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            <div>
-              <h3 style={{ color: '#28a745' }}>📝 Action Items</h3>
-              <ul>
-                {result.action_items && result.action_items.map((item, index) => (
-                  <li key={index} style={{ marginBottom: '8px', lineHeight: '1.4' }}>{item}</li>
-                ))}
-              </ul>
+          <div style={{margin: '40px 0', borderTop: '2px dashed #cbd5e1'}} />
+
+          {/* --- TAMIL LAYOUT COLUMN --- */}
+          <h2 style={styles.sectionHeading}>🇮🇳 தமிழ் சுருக்கம் (Tamil Summary)</h2>
+          <div style={styles.summaryBoxTa}>
+            <p style={styles.boxBodyText}>{result.summary_ta}</p>
+          </div>
+          <div style={styles.gridSplit}>
+            <div style={styles.cardBox}>
+              <h4 style={{color:'#16a34a', margin:'0 0 10px 0'}}>📝 செய்ய வேண்டியவை (Actions)</h4>
+              <ul>{result.action_items_ta?.map((item, i) => <li key={i} style={styles.listItem}>{item}</li>)}</ul>
             </div>
-            <div>
-              <h3 style={{ color: '#6f42c1' }}>⚖️ Key Decisions</h3>
-              <ul>
-                {result.key_decisions && result.key_decisions.map((item, index) => (
-                  <li key={index} style={{ marginBottom: '8px', lineHeight: '1.4' }}>{item}</li>
-                ))}
-              </ul>
+            <div style={styles.cardBox}>
+              <h4 style={{color:'#ea580c', margin:'0 0 10px 0'}}>⚖️ முக்கிய முடிவுகள் (Decisions)</h4>
+              <ul>{result.key_decisions_ta?.map((item, i) => <li key={i} style={styles.listItem}>{item}</li>)}</ul>
             </div>
           </div>
+
         </div>
       )}
     </div>
   );
 }
+
+const styles = {
+  container: { fontFamily: 'sans-serif', maxWidth: '850px', margin: '40px auto', padding: '0 20px', backgroundColor: '#f8fafc' },
+  headerSection: { textAlign: 'center', marginBottom: '30px' },
+  badge: { backgroundColor: '#ffedd5', color: '#ea580c', padding: '6px 12px', borderRadius: '9999px', fontSize: '12px', fontWeight: '700' },
+  title: { fontSize: '32px', color: '#0f172a', marginTop: '12px' },
+  subtitle: { color: '#64748b', fontSize: '15px', lineHeight: '1.5' },
+  mainCard: { backgroundColor: '#fff', borderRadius: '14px', padding: '25px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' },
+  voiceRow: { display: 'flex', justifyContent: 'center', marginBottom: '15px' },
+  btnMicStart: { padding: '12px 24px', background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' },
+  btnMicStop: { padding: '12px 24px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', animation: 'pulseGlow 1.5s infinite ease-in-out' },
+  btnDisabled: { padding: '12px 24px', background: '#cbd5e1', color: '#94a3b8', border: 'none', borderRadius: '10px', cursor: 'not-allowed' },
+  textarea: { width: '100%', padding: '14px', fontSize: '16px', borderRadius: '10px', border: '1px solid #cbd5e1', boxSizing: 'border-box', outline: 'none', backgroundColor: '#f8fafc' },
+  errorAlert: { color: '#b91c1c', backgroundColor: '#fef2f2', padding: '12px', borderRadius: '8px', marginTop: '12px' },
+  btnActionActive: { marginTop: '15px', padding: '14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '700', width: '100%' },
+  btnActionDisabled: { marginTop: '15px', padding: '14px', background: '#e2e8f0', color: '#64748b', border: 'none', borderRadius: '10px', width: '100%', animation: 'shimmer 1.5s infinite linear' },
+  resultsContainer: { marginTop: '35px', paddingBottom: '50px' },
+  sectionHeading: { fontSize: '20px', fontWeight: '700', color: '#0f172a', marginBottom: '15px' },
+  summaryBoxEn: { backgroundColor: '#eff6ff', borderLeft: '5px solid #2563eb', padding: '15px', borderRadius: '0 10px 10px 0', marginBottom: '15px' },
+  summaryBoxTa: { backgroundColor: '#f0fdf4', borderLeft: '5px solid #16a34a', padding: '15px', borderRadius: '0 10px 10px 0', marginBottom: '15px' },
+  boxBodyText: { margin: 0, lineHeight: '1.6', color: '#334155', fontSize: '15px' },
+  gridSplit: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' },
+  cardBox: { backgroundColor: '#fff', padding: '18px', borderRadius: '12px', border: '1px solid #e2e8f0' },
+  listItem: { color: '#475569', fontSize: '14px', marginBottom: '6px', lineHeight: '1.4' }
+};
