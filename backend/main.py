@@ -39,7 +39,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
     temp_file_path = f"temp_{file.filename}"
     
     try:
-        # Read incoming media bytes straight from memory buffer
+        # Read incoming media bytes straight from memory buffer safely
         contents = await file.read()
         with open(temp_file_path, "wb") as f:
             f.write(contents)
