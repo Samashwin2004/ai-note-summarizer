@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
-from openai import OpenAI
+from groq import Groq
 from dotenv import load_dotenv
 import json
 
@@ -19,9 +19,8 @@ app.add_middleware(
     allow_headers=["*"],  
 )
 
-# Initialize the Groq Cloud SDK Client
-client = OpenAI(
-    base_url="https://api.groq.com/openai/v1",
+# Initialize the Native Groq Cloud Client safely
+client = Groq(
     api_key=os.environ.get("GROQ_API_KEY")
 )
 
@@ -49,7 +48,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
             transcription = client.audio.transcriptions.create(
                 model="whisper-large-v3", 
                 file=audio_file,
-                language="ta"  # Sets transcription capture mode specifically for Tamil dialect matrix
+                language="ta"  # Tamil/Tanglish processing configuration
             )
         
         transcript_text = transcription.text
