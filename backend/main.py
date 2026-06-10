@@ -1,16 +1,16 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
 import json
+import shutil
 
 load_dotenv()
 
 app = FastAPI()
 
-# --- CORS MIDDLEWARE SECURITY BRIDGE ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  
@@ -19,13 +19,11 @@ app.add_middleware(
     allow_headers=["*"],  
 )
 
-# Initialize the Groq Cloud SDK Client
 client = OpenAI(
     base_url="https://api.groq.com/openai/v1",
     api_key=os.environ.get("GROQ_API_KEY")
 )
 
-# Request schema for incoming frontend note packages
 class NoteInput(BaseModel):
     text: str
 
@@ -33,25 +31,62 @@ class NoteInput(BaseModel):
 async def summarize_note(input_data: NoteInput):
     if not input_data.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
+    return generate_bilingual_summary(input_data.text)
+
+@app.post("/transcribe")
+async def transcribe_audio(file: UploadFile = File(...)):
+    temp_file_path = f"temp_{file.filename}"
+    with open(temp_file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
     
     try:
-        # Requesting completion matrix from Groq using the active supported model
+        with open(temp_file_path, "rb") as audio_file:
+            # .transcriptions keeps the original spoken Tamil language intact
+            transcription = client.audio.transcriptions.create(
+                model="whisper-large-v3", 
+                file=audio_file,
+                language="ta"  # Explicitly targets Tamil/Tanglish speech matrices
+            )
+        
+        transcript_text = transcription.text
+        summary_data = generate_bilingual_summary(transcript_text)
+        
+        return {
+            "transcript": transcript_text,
+            "data": summary_data
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+
+def generate_bilingual_summary(text_content: str):
+    try:
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # <-- Updated to active model identifier
+            model="llama-3.1-8b-instant",
             messages=[
                 {
                     "role": "system", 
-                    "content": "You are an expert assistant. Summarize the text into clear sections: Summary, Action Items, and Key Decisions. Respond in structured JSON matching fields: summary (string), action_items (list of strings), key_decisions (list of strings)."
+                    "content": (
+                        "You are an assistant processing order records. Analyze the text and generate a summary, "
+                        "action items, and key decisions. You MUST provide the output in BOTH English and Tamil. "
+                        "Respond strictly in JSON matching this exact key structure:\n"
+                        "{\n"
+                        "  \"summary_en\": \"English summary here\",\n"
+                        "  \"summary_ta\": \"Tamil summary here\",\n"
+                        "  \"action_items_en\": [\"Item 1\", \"Item 2\"],\n"
+                        "  \"action_items_ta\": [\"தமிழ் உருப்படி 1\", \"தமிழ் உருப்படி 2\"],\n"
+                        "  \"key_decisions_en\": [\"Decision 1\"],\n"
+                        "  \"key_decisions_ta\": [\"தீர்மானம் 1\"]\n"
+                        "}"
+                    )
                 },
-                {
-                    "role": "user", 
-                    "content": input_data.text
-                }
+                {"role": "user", "content": text_content}
             ],
             response_format={"type": "json_object"}
         )
-        
         return json.loads(response.choices[0].message.content)
-        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise Exception(f"LLM Error: {str(e)}")
