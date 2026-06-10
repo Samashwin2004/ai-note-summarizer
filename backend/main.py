@@ -5,12 +5,12 @@ import os
 from openai import OpenAI
 from dotenv import load_dotenv
 import json
-import shutil
 
 load_dotenv()
 
 app = FastAPI()
 
+# --- CORS MIDDLEWARE SECURITY BRIDGE ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  
@@ -19,6 +19,7 @@ app.add_middleware(
     allow_headers=["*"],  
 )
 
+# Initialize the Groq Cloud SDK Client
 client = OpenAI(
     base_url="https://api.groq.com/openai/v1",
     api_key=os.environ.get("GROQ_API_KEY")
@@ -35,17 +36,21 @@ async def summarize_note(input_data: NoteInput):
 
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
+    # Create a clean temporary file path
     temp_file_path = f"temp_{file.filename}"
-    with open(temp_file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
     
     try:
+        # Read the raw incoming bytes directly from memory safely
+        contents = await file.read()
+        with open(temp_file_path, "wb") as f:
+            f.write(contents)
+            
+        # Send the file to Groq Whisper
         with open(temp_file_path, "rb") as audio_file:
-            # .transcriptions keeps the original spoken Tamil language intact
             transcription = client.audio.transcriptions.create(
                 model="whisper-large-v3", 
                 file=audio_file,
-                language="ta"  # Explicitly targets Tamil/Tanglish speech matrices
+                language="ta"  # Hardcoded target for Tamil/Tanglish vocal speech
             )
         
         transcript_text = transcription.text
@@ -57,8 +62,12 @@ async def transcribe_audio(file: UploadFile = File(...)):
         }
 
     except Exception as e:
+        # This will print the EXACT error message to your Render logs so we can see it
+        print(f"TRANSCRIBE ERROR DEBUG: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+        
     finally:
+        # Guaranteed cleanup of the temp file
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
